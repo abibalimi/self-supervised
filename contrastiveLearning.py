@@ -109,3 +109,17 @@ def contrastive_loss(z1, z2, temperature=0.5):
     # Compute cross-entropy loss
     loss = nn.functional.cross_entropy(sim_matrix, labels)
     return loss
+
+
+
+
+
+# Initialize model, optimizer, and loss
+encoder = Encoder()
+projection_head = ProjectionHead()
+model = SimCLR(encoder, projection_head)
+optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+
+
+
