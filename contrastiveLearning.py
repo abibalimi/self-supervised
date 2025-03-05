@@ -123,3 +123,28 @@ optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
 
 
+
+# Training loop
+for epoch in range(epochs):
+    model.train()
+    total_loss = 0
+    for batch_idx, (x, _) in enumerate(train_loader):
+        # Generate two augmented views
+        x1, x2 = x, x  # In practice, apply different augmentations here
+
+        # Forward pass
+        z1, z2 = model(x1, x2)
+
+        # Compute contrastive loss
+        loss = contrastive_loss(z1, z2, temperature)
+
+        # Backward pass
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        total_loss += loss.item()
+
+    print(f"Epoch [{epoch+1}/{epochs}], Loss: {total_loss/len(train_loader):.4f}")
+    
+print("Training complete!")
