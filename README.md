@@ -1,1 +1,1 @@
-# self-supervized
+# self-supervised
