@@ -1,1 +1,1 @@
-# Self-Supervised Learnig
+# Self-Supervised Learning
