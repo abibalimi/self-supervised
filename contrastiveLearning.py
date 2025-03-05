@@ -20,6 +20,9 @@ epochs = 10
 # 4 - Contrastive Loss
 
 
+
+
+
 #          ***         Data Augmentation         ***         #
 transform = transforms.Compose([
     transforms.RandomResizedCrop(32),
@@ -36,6 +39,7 @@ train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
 
 
+
 #          ***         Encoder Network (ResNet-18)         ***         #
 class Encoder(nn.Module):
     def __init__(self):
@@ -46,6 +50,8 @@ class Encoder(nn.Module):
     def forward(self, x):
         return self.backbone(x)
     
+
+
 
 
 #          ***         Projection Head         ***         #
@@ -61,3 +67,24 @@ class ProjectionHead(nn.Module):
         x = self.relu(x)
         x = self.fc2(x)
         return x
+    
+    
+    
+
+#          ***         SimCLR Model         ***         #
+class SimCLR(nn.Module):
+    def __init__(self, encoder, projection_head):
+        super(SimCLR, self).__init__()
+        self.encoder = encoder
+        self.projection_head = projection_head
+
+    def forward(self, x1, x2):
+        # Encode the two augmented views
+        h1 = self.encoder(x1)
+        h2 = self.encoder(x2)
+
+        # Project to the lower-dimensional space
+        z1 = self.projection_head(h1)
+        z2 = self.projection_head(h2)
+
+        return z1, z2
