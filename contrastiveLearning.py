@@ -71,6 +71,7 @@ class ProjectionHead(nn.Module):
     
     
 
+
 #          ***         SimCLR Model         ***         #
 class SimCLR(nn.Module):
     def __init__(self, encoder, projection_head):
@@ -88,3 +89,23 @@ class SimCLR(nn.Module):
         z2 = self.projection_head(h2)
 
         return z1, z2
+
+    
+    
+    
+#          ***         Contrastive Loss (NT-Xent)         ***         #
+def contrastive_loss(z1, z2, temperature=0.5):
+    batch_size = z1.size(0)
+    z = torch.cat([z1, z2], dim=0)  # Concatenate both views
+    z = nn.functional.normalize(z, dim=1)  # Normalize feature vectors
+
+    # Compute similarity matrix
+    sim_matrix = torch.matmul(z, z.T) / temperature
+
+    # Create labels for positive pairs
+    labels = torch.arange(batch_size, device=z.device)
+    labels = torch.cat([labels + batch_size, labels])  # Positive pairs are diagonal elements
+
+    # Compute cross-entropy loss
+    loss = nn.functional.cross_entropy(sim_matrix, labels)
+    return loss
