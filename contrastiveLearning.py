@@ -34,3 +34,14 @@ train_dataset = CIFAR10(root='./data', train=True, download=True, transform=tran
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
 
+
+
+#          ***         Encoder Network (ResNet-18)         ***         #
+class Encoder(nn.Module):
+    def __init__(self):
+        super(Encoder, self).__init__()
+        self.backbone = resnet18(pretrained=False)
+        self.backbone.fc = nn.Identity()  # Remove the final classification layer
+
+    def forward(self, x):
+        return self.backbone(x)
