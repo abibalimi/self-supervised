@@ -6,7 +6,6 @@ from torchvision.datasets import CIFAR10
 from torch.utils.data import DataLoader
 from torchvision.models import resnet18
 from transform_helpers import (
-    augment0,
     augment1,
     augment2,
     augment3
@@ -32,11 +31,17 @@ epochs = 20
 
 
 #          ***         Data Augmentation         ***         #
-transform = augment0
+transform = transforms.Compose([
+    transforms.RandomResizedCrop(32),
+    transforms.RandomHorizontalFlip(),
+    transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.1),
+    transforms.ToTensor(),
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+])
 
 
 # Load CIFAR-10 dataset
-train_dataset = CIFAR10(root='./data', train=True, download=True)#, transform=transform)
+train_dataset = CIFAR10(root='./data', train=True, download=True, transform=transform)
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
 
@@ -144,10 +149,13 @@ for epoch in range(epochs):
     model.train()
     total_loss = 0
     for batch_idx, (x, _) in enumerate(train_loader):
+        # Move data to device
+        x = x.to(device)
+        
         # Generate two augmented views
-        x1, x2 = x.to(device), x.to(device)  # In practice, apply different augmentations here
-        x1 = torch.stack([augment0(img) for img in x]).to(device)
+        x1 = x   # torch.stack([augment1(img) for img in x]).to(device)
         x2 = torch.stack([augment1(img) for img in x]).to(device)
+        
         # Forward pass
         z1, z2 = model(x1, x2)
 
