@@ -5,6 +5,12 @@ import torchvision.transforms as transforms
 from torchvision.datasets import CIFAR10
 from torch.utils.data import DataLoader
 from torchvision.models import resnet18
+from transform_helpers import (
+    augment0,
+    augment1,
+    augment2,
+    augment3
+)
 import matplotlib.pyplot as plt
 import time
 
@@ -13,7 +19,7 @@ import time
 batch_size = 256
 temperature = 0.5
 learning_rate = 0.001
-epochs = 10
+epochs = 20
 
 # Steps:
 # 1 - Data Augmentation
@@ -26,16 +32,11 @@ epochs = 10
 
 
 #          ***         Data Augmentation         ***         #
-transform = transforms.Compose([
-    transforms.RandomResizedCrop(32),
-    transforms.RandomHorizontalFlip(),
-    transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.1),
-    transforms.ToTensor(),
-    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-])
+transform = augment0
+
 
 # Load CIFAR-10 dataset
-train_dataset = CIFAR10(root='./data', train=True, download=True, transform=transform)
+train_dataset = CIFAR10(root='./data', train=True, download=True)#, transform=transform)
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
 
@@ -145,7 +146,8 @@ for epoch in range(epochs):
     for batch_idx, (x, _) in enumerate(train_loader):
         # Generate two augmented views
         x1, x2 = x.to(device), x.to(device)  # In practice, apply different augmentations here
-
+        x1 = torch.stack([augment0(img) for img in x]).to(device)
+        x2 = torch.stack([augment1(img) for img in x]).to(device)
         # Forward pass
         z1, z2 = model(x1, x2)
 
@@ -170,7 +172,7 @@ for epoch in range(epochs):
 
     # Save model checkpoint
     if (epoch + 1) % 5 == 0:
-        torch.save(model.state_dict(), f"simclr_checkpoint_epoch_{epoch+1}.pth")
+        torch.save(model.state_dict(), f"simclr_checkpoint_epoch_{epoch+1}/{epochs}_augment0_1.pth")
         
           
 print(f"Training complete after {time.time()-t0}s!")
@@ -182,4 +184,11 @@ plt.xlabel("Epoch")
 plt.ylabel("Loss")
 plt.title("Learning Curve")
 plt.legend()
-plt.show()
+
+# Save the plot
+plt.savefig("learning_curve_epochs_20_augment0_1.png")  # Save as PNG
+plt.savefig("learning_curve_epochs_20_augment0_1.pdf")  # Save as PDF
+plt.savefig("learning_curve_epochs_20_augment0_1.svg")  # Save as SVG
+
+
+#plt.show()
