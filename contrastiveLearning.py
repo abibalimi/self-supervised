@@ -5,6 +5,7 @@ import torchvision.transforms as transforms
 from torchvision.datasets import CIFAR10
 from torch.utils.data import DataLoader
 from torchvision.models import resnet18
+import time
 
 
 # Hyperparameters
@@ -44,7 +45,7 @@ train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 class Encoder(nn.Module):
     def __init__(self):
         super(Encoder, self).__init__()
-        self.backbone = resnet18(pretrained=False)
+        self.backbone = resnet18(weights=None)   # Random initialization
         self.backbone.fc = nn.Identity()  # Remove the final classification layer
 
     def forward(self, x):
@@ -125,6 +126,7 @@ optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
 
 # Training loop
+t0 = time.time()
 for epoch in range(epochs):
     model.train()
     total_loss = 0
@@ -147,4 +149,4 @@ for epoch in range(epochs):
 
     print(f"Epoch [{epoch+1}/{epochs}], Loss: {total_loss/len(train_loader):.4f}")
     
-print("Training complete!")
+print(f"Training complete after {time.time()-t0}s!")
