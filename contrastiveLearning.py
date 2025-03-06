@@ -185,6 +185,8 @@ for epoch in range(epochs):
           
 print(f"Training complete after {time.time()-t0}s!")
 
+# 10 epochs run on mps backend devide in ~10 minutes.
+
 
 # Plot learning curve
 plt.plot(range(1, epochs+1), loss_history, label="Contrastive Loss")
