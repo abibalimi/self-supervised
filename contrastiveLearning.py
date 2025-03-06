@@ -115,6 +115,14 @@ def contrastive_loss(z1, z2, temperature=0.5):
 
 
 
+# Set device
+device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+print(f"Using device: {device}")
+
+
+
+
+
 # Initialize model, optimizer, and loss
 encoder = Encoder()
 projection_head = ProjectionHead()
