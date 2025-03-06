@@ -1,6 +1,8 @@
 # Self-Supervised Learning
 
 
+## Constrastive Learning: 
+
 ### Implementation Steps
 
 - Data Augmentation: Create two augmented views of each image.
