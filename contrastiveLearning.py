@@ -5,6 +5,7 @@ import torchvision.transforms as transforms
 from torchvision.datasets import CIFAR10
 from torch.utils.data import DataLoader
 from torchvision.models import resnet18
+import matplotlib.pyplot as plt
 import time
 
 
@@ -124,9 +125,9 @@ print(f"Using device: {device}")
 
 
 # Initialize model, optimizer, and loss
-encoder = Encoder()
-projection_head = ProjectionHead()
-model = SimCLR(encoder, projection_head)
+encoder = Encoder().to(device)
+projection_head = ProjectionHead().to(device)
+model = SimCLR(encoder, projection_head).to(device)
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
 
@@ -135,12 +136,15 @@ optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
 # Training loop
 t0 = time.time()
+
+loss_history = []
+
 for epoch in range(epochs):
     model.train()
     total_loss = 0
     for batch_idx, (x, _) in enumerate(train_loader):
         # Generate two augmented views
-        x1, x2 = x, x  # In practice, apply different augmentations here
+        x1, x2 = x.to(device), x.to(device)  # In practice, apply different augmentations here
 
         # Forward pass
         z1, z2 = model(x1, x2)
@@ -155,6 +159,27 @@ for epoch in range(epochs):
 
         total_loss += loss.item()
 
-    print(f"Epoch [{epoch+1}/{epochs}], Loss: {total_loss/len(train_loader):.4f}")
+
     
+    # Log loss
+    avg_loss = total_loss / len(train_loader)
+    loss_history.append(avg_loss)
+    print(f"Epoch [{epoch+1}/{epochs}], Loss: {avg_loss:.4f}")
+
+
+
+    # Save model checkpoint
+    if (epoch + 1) % 5 == 0:
+        torch.save(model.state_dict(), f"simclr_checkpoint_epoch_{epoch+1}.pth")
+        
+          
 print(f"Training complete after {time.time()-t0}s!")
+
+
+# Plot learning curve
+plt.plot(range(1, epochs+1), loss_history, label="Contrastive Loss")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.title("Learning Curve")
+plt.legend()
+plt.show()
