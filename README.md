@@ -1,9 +1,9 @@
 # Self-Supervised Learning
 
 
-## Constrastive Learning: 
+## Constrastive Learning
 
-### Implementation Steps
+### Implementation Steps of SimCLR
 
 - Data Augmentation: Create two augmented views of each image.
 - Encoder Network: Use a convolutional neural network (CNN) to encode the images into feature vectors.
