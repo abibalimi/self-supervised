@@ -1,7 +1,7 @@
 # Self-Supervised Learning
 
 
-# Implementation Steps
+## Implementation Steps
 
 - Data Augmentation: Create two augmented views of each image.
 - Encoder Network: Use a convolutional neural network (CNN) to encode the images into feature vectors.
