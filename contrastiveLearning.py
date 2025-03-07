@@ -6,13 +6,15 @@ from torchvision.datasets import CIFAR10
 from torch.utils.data import DataLoader
 from torchvision.models import resnet18
 from transform_helpers import (
-    augment1,
-    augment2,
-    augment3
+    
+    augmentation1,
+    augmentation2,
 )
 from pathlib import Path
 import matplotlib.pyplot as plt
 import time
+import numpy as np
+
 
 
 # Hyperparameters
@@ -32,18 +34,30 @@ epochs = 20
 
 
 #          ***         Data Augmentation         ***         #
-transform = transforms.Compose([
-    transforms.RandomResizedCrop(32),
-    transforms.RandomHorizontalFlip(),
-    transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.1),
-    transforms.ToTensor(),
-    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-])
+# transform = transforms.Compose([
+#     transforms.RandomResizedCrop(32),
+#     transforms.RandomHorizontalFlip(),
+#     transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.1),
+#     transforms.ToTensor(),
+#     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+# ])
 
+# Custom dataset to apply Albumentations
+class AugmentedDataset(torch.utils.data.Dataset):
+    def __init__(self, dataset, augmentation1, augmentation2):
+        self.dataset = dataset
+        self.augmentation1 = augmentation1
+        self.augmentation2 = augmentation2
 
-# Load CIFAR-10 dataset
-train_dataset = CIFAR10(root='./data', train=True, download=True, transform=transform)
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)#, num_workers=4)
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        image, label = self.dataset[idx]
+        image = np.array(image)  # Convert PIL Image to numpy array
+        x1 = self.augmentation1(image=image)['image']
+        x2 = self.augmentation2(image=image)['image']
+        return x1, x2, label
 
 
 
@@ -122,96 +136,88 @@ def contrastive_loss(z1, z2, temperature=0.5):
 
 
 
-
-# Set device
-device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-print(f"Using device: {device}")
-
-
-
-
-
-# Initialize model, optimizer, and loss
-encoder = Encoder().to(device)
-projection_head = ProjectionHead().to(device)
-model = SimCLR(encoder, projection_head).to(device)
-optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-
-
-
-
-
-# Create a directory to save checkpoints
-checkpoint_dir = Path("./simclr_checkpoints")
-checkpoint_dir.mkdir(parents=True, exist_ok=True)
-
-
-
-
-
-# Training loop
-t0 = time.time()
-
-loss_history = []
-
-for epoch in range(epochs):
-    model.train()
-    total_loss = 0
-    for batch_idx, (x, _) in enumerate(train_loader):
-        # Move data to device
-        x = x.to(device)
-        
-        # Generate two augmented views
-        x1 = x
-        x2 = x
-        
-        # Forward pass
-        z1, z2 = model(x1, x2)
-
-        # Compute contrastive loss
-        loss = contrastive_loss(z1, z2, temperature)
-
-        # Backward pass
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        total_loss += loss.item()
-
-
+def main():
+    # Set device
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    print(f"Using device: {device}")
     
-    # Log loss
-    avg_loss = total_loss / len(train_loader)
-    loss_history.append(avg_loss)
-    print(f"Epoch [{epoch+1}/{epochs}], Loss: {avg_loss:.4f}")
+
+    # Load CIFAR-10 dataset
+    to_load = time.time()
+    train_dataset = CIFAR10(root='./data', train=True, download=True)#, transform=transform)
+    augmented_dataset = AugmentedDataset(train_dataset, augmentation1, augmentation2)
+    train_loader = DataLoader(augmented_dataset, batch_size=batch_size, shuffle=True, num_workers=8)
+    print(f"Loading complete after {time.time()-to_load}s!")
+    
+
+    # Initialize model, optimizer, and loss
+    encoder = Encoder().to(device)
+    projection_head = ProjectionHead().to(device)
+    model = SimCLR(encoder, projection_head).to(device)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
 
+    # Create a directory to save checkpoints
+    checkpoint_dir = Path("./simclr_checkpoints")
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-    # Save model checkpoint
-    if (epoch + 1) % 5 == 0:
-        checkpoint_path = checkpoint_dir / f"simclr_checkpoint_epoch_{epoch+1}.pth"
-        torch.save(model.state_dict(), checkpoint_path)
-        print(f"Checkpoint saved at {checkpoint_path}")
 
+    # Training loop
+    t0_train = time.time()
+
+    loss_history = []
+
+    for epoch in range(epochs):
+        model.train()
+        total_loss = 0
+        for batch_idx, (x1, x2, _) in enumerate(train_loader):
+            # Move data to device
+            x1, x2 = x1.to(device), x2.to(device)
+            
+            # Forward pass
+            z1, z2 = model(x1, x2)
+
+            # Compute contrastive loss
+            loss = contrastive_loss(z1, z2, temperature)
+
+            # Backward pass
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            total_loss += loss.item()
+            
+        # Log loss
+        avg_loss = total_loss / len(train_loader)
+        loss_history.append(avg_loss)
+        print(f"Epoch [{epoch+1}/{epochs}], Loss: {avg_loss:.4f}")
+
+        # Save model checkpoint
+        if (epoch + 1) % 5 == 0:
+            checkpoint_path = checkpoint_dir / f"simclr_checkpoint_epoch_{epoch+1}_A.pth"
+            torch.save(model.state_dict(), checkpoint_path)
+            print(f"Checkpoint saved at {checkpoint_path}")
         
-          
-print(f"Training complete after {time.time()-t0}s!")
+    print(f"Training complete after {time.time()-t0_train}s!")
 
-# 10 epochs run on mps backend device in ~10 minutes.
-# 20 epochs run on mps backend device in ~27 minutes.
-
-
-# Plot learning curve
-plt.plot(range(1, epochs+1), loss_history, label="Contrastive Loss")
-plt.xlabel("Epoch")
-plt.ylabel("Loss")
-plt.title("Learning Curve")
-plt.legend()
-
-# Save the plot
-plt.savefig("learning_curve_epochs.png")  # Save as PNG
-plt.savefig("learning_curve_epochs.pdf")  # Save as PDF
-plt.savefig("learning_curve_epochs.svg")  # Save as SVG
+    # 10 epochs run on mps backend device in ~10 minutes.
+    # 20 epochs run on mps backend device in ~27 minutes.
 
 
-#plt.show
+    # Plot learning curve
+    plt.plot(range(1, epochs+1), loss_history, label="Contrastive Loss")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.title("Learning Curve")
+    plt.legend()
+
+    # Save the plot
+    plt.savefig("learning_curve_epochs_A.png")  # Save as PNG
+    plt.savefig("learning_curve_epochs_A.pdf")  # Save as PDF
+    plt.savefig("learning_curve_epochs_A.svg")  # Save as SVG
+
+
+if __name__ == "__main__":
+    import multiprocessing as mp
+    mp.freeze_support() # required when using the spawn start method.
+    main()
