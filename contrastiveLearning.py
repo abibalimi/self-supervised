@@ -4,7 +4,7 @@ import torch.optim as optim
 import torchvision.transforms as transforms
 from torchvision.datasets import CIFAR10
 from torch.utils.data import DataLoader
-from torchvision.models import resnet18
+from torchvision.models import resnet50
 from transform_helpers import (
     
     augmentation1,
@@ -14,14 +14,17 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import time
 import numpy as np
+from lars_optimizer import LARS
 
 
 
 # Hyperparameters
-batch_size = 256
-temperature = 0.5
+batch_size = 4096
+temperature = 0.1
 learning_rate = 0.001
-epochs = 20
+base_lr = 0.3 * batch_size / 256  # Learning rate = 4.8
+weight_decay = 1e-6
+epochs = 100
 
 # Steps:
 # 1 - Data Augmentation
@@ -57,7 +60,7 @@ class AugmentedDataset(torch.utils.data.Dataset):
 class Encoder(nn.Module):
     def __init__(self):
         super(Encoder, self).__init__()
-        self.backbone = resnet18(weights=None)   # Random initialization
+        self.backbone = resnet50(weights=None)   # Random initialization
         self.backbone.fc = nn.Identity()  # Remove the final classification layer
 
     def forward(self, x):
