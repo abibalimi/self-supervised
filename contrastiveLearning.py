@@ -10,6 +10,7 @@ from transform_helpers import (
     augment2,
     augment3
 )
+from pathlib import Path
 import matplotlib.pyplot as plt
 import time
 
@@ -32,11 +33,11 @@ epochs = 20
 
 #          ***         Data Augmentation         ***         #
 transform = transforms.Compose([
-    #transforms.RandomResizedCrop(32),
-    #transforms.RandomHorizontalFlip(),
-    #transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.1),
+    transforms.RandomResizedCrop(32),
+    transforms.RandomHorizontalFlip(),
+    transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.1),
     transforms.ToTensor(),
-    #transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 ])
 
 
@@ -140,6 +141,14 @@ optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
 
 
+# Create a directory to save checkpoints
+checkpoint_dir = Path("./simclr_checkpoints")
+checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+
+
+
+
 # Training loop
 t0 = time.time()
 
@@ -153,8 +162,8 @@ for epoch in range(epochs):
         x = x.to(device)
         
         # Generate two augmented views
-        x1 = torch.stack([augment1(img) for img in x]).to(device)
-        x2 = torch.stack([augment2(img) for img in x]).to(device)
+        x1 = x
+        x2 = x
         
         # Forward pass
         z1, z2 = model(x1, x2)
@@ -180,12 +189,16 @@ for epoch in range(epochs):
 
     # Save model checkpoint
     if (epoch + 1) % 5 == 0:
-        torch.save(model.state_dict(), f"simclr_checkpoint_epoch_{epoch+1}/{epochs}_augment0_1.pth")
+        checkpoint_path = checkpoint_dir / f"simclr_checkpoint_epoch_{epoch+1}.pth"
+        torch.save(model.state_dict(), checkpoint_path)
+        print(f"Checkpoint saved at {checkpoint_path}")
+
         
           
 print(f"Training complete after {time.time()-t0}s!")
 
-# 10 epochs run on mps backend devide in ~10 minutes.
+# 10 epochs run on mps backend device in ~10 minutes.
+# 20 epochs run on mps backend device in ~27 minutes.
 
 
 # Plot learning curve
@@ -196,9 +209,9 @@ plt.title("Learning Curve")
 plt.legend()
 
 # Save the plot
-plt.savefig("learning_curve_epochs_20_augment0_1.png")  # Save as PNG
-plt.savefig("learning_curve_epochs_20_augment0_1.pdf")  # Save as PDF
-plt.savefig("learning_curve_epochs_20_augment0_1.svg")  # Save as SVG
+plt.savefig("learning_curve_epochs.png")  # Save as PNG
+plt.savefig("learning_curve_epochs.pdf")  # Save as PDF
+plt.savefig("learning_curve_epochs.svg")  # Save as SVG
 
 
-#plt.show()
+#plt.show
