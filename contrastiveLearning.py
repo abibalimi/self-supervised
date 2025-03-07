@@ -34,14 +34,6 @@ epochs = 20
 
 
 #          ***         Data Augmentation         ***         #
-# transform = transforms.Compose([
-#     transforms.RandomResizedCrop(32),
-#     transforms.RandomHorizontalFlip(),
-#     transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.1),
-#     transforms.ToTensor(),
-#     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-# ])
-
 # Custom dataset to apply Albumentations
 class AugmentedDataset(torch.utils.data.Dataset):
     def __init__(self, dataset, augmentation1, augmentation2):
@@ -58,8 +50,6 @@ class AugmentedDataset(torch.utils.data.Dataset):
         x1 = self.augmentation1(image=image)['image']
         x2 = self.augmentation2(image=image)['image']
         return x1, x2, label
-
-
 
 
 
