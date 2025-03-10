@@ -1,11 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torchvision.transforms as transforms
 from torchvision.datasets import CIFAR10
 from torch.utils.data import Dataset, DataLoader
 from modified_ResNet50 import ModifiedResNet50
-from transform_helpers import augmentation1 #, augmentation2 # Leave out the Gaussian blur
+from transform_helpers import augmentation1 as augment#, augmentation2 # Leave out the Gaussian blur
 from pathlib import Path
 import matplotlib.pyplot as plt
 import time
@@ -15,9 +14,10 @@ import numpy as np
 
 # Hyperparameters
 batch_size = 1024 #256
-temperature = 0.5 
-learning_rate = 0.001
-epochs = 10
+base_lr = 0.3 * batch_size / 256  # Learning rate = 1.2
+weight_decay = 1e-6
+temperature = 0.5
+epochs = 100
 
 # Steps:
 # 1 - Data Augmentation
@@ -32,10 +32,9 @@ epochs = 10
 #          ***         Data Augmentation         ***         #
 # Custom dataset to apply Albumentations
 class AugmentedDataset(Dataset):
-    def __init__(self, dataset, augmentation1, augmentation2):
+    def __init__(self, dataset, augment):
         self.dataset = dataset
-        self.augmentation1 = augmentation1
-        self.augmentation2 = augmentation2
+        self.augmentation1 = augment
 
     def __len__(self):
         return len(self.dataset)
@@ -43,8 +42,8 @@ class AugmentedDataset(Dataset):
     def __getitem__(self, idx):
         image, label = self.dataset[idx]
         image = np.array(image)  # Convert PIL Image to numpy array
-        x1 = self.augmentation1(image=image)['image']
-        x2 = self.augmentation2(image=image)['image']
+        x1 = self.augmentation(image=image)['image']
+        x2 = self.augmentation(image=image)['image']
         return x1, x2, label
 
 
@@ -127,7 +126,7 @@ def contrastive_loss(z1, z2, temperature=0.1):
 def load_dataset(train=True):
     """Loads split datasets"""
     dataset = CIFAR10(root='./data', train=train, download=True)
-    augmented_dataset = AugmentedDataset(dataset, augmentation1, augmentation2)
+    augmented_dataset = AugmentedDataset(dataset, augment)
     dataset_loader = DataLoader(augmented_dataset, batch_size=batch_size, shuffle=True, num_workers=8)
     return dataset_loader
     
@@ -154,7 +153,14 @@ def main():
     encoder = Encoder().to(device)
     projection_head = ProjectionHead().to(device)
     model = SimCLR(encoder, projection_head).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = optim.Adam(model.parameters(), lr=base_lr, weight_decay=weight_decay)
+    
+
+    # Learning rate schedule
+    warmup_epochs = 10
+    total_epochs = 100
+    scheduler = optim.CosineAnnealingLR(optimizer, T_max=total_epochs - warmup_epochs)
+    warmup_scheduler = optim.LinearLR(optimizer, start_factor=0.01, total_iters=warmup_epochs)
 
 
     # Create a directory to save checkpoints
@@ -189,7 +195,11 @@ def main():
             per_epoch_train_loss += train_loss.item()
 
 
-        
+         # Update learning rate
+        if epoch < warmup_epochs:
+            warmup_scheduler.step()
+        else:
+            scheduler.step()
         
         # Set the model to evaluation/validation mode
         model.eval()
