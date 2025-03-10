@@ -4,12 +4,8 @@ import torch.optim as optim
 import torchvision.transforms as transforms
 from torchvision.datasets import CIFAR10
 from torch.utils.data import Dataset, DataLoader
-from torchvision.models import resnet18
-from transform_helpers import (
-    
-    augmentation1,
-    augmentation2,
-)
+from modified_ResNet50 import ModifiedResNet50
+from transform_helpers import augmentation1, augmentation2
 from pathlib import Path
 import matplotlib.pyplot as plt
 import time
@@ -18,8 +14,8 @@ import numpy as np
 
 
 # Hyperparameters
-batch_size = 256
-temperature = 0.5
+batch_size = 1024 #256
+temperature = 0.5 
 learning_rate = 0.001
 epochs = 10
 
@@ -57,7 +53,7 @@ class AugmentedDataset(Dataset):
 class Encoder(nn.Module):
     def __init__(self):
         super(Encoder, self).__init__()
-        self.backbone = resnet18(weights=None)   # Random initialization
+        self.backbone = ModifiedResNet50(weights=None)   # Random initialization
         self.backbone.fc = nn.Identity()  # Remove the final classification layer
 
     def forward(self, x):
@@ -191,17 +187,8 @@ def main():
             optimizer.step()
             
             per_epoch_train_loss += train_loss.item()
-            
-        # Log loss
-        # avg_train_loss =per_epoch_train_loss / len(train_loader)
-        # train_loss_history.append(avg_train_loss)
-        # print(f"Epoch [{epoch+1}/{epochs}], Loss: {avg_train_loss:.4f}")
 
-        # Save model checkpoint
-        if (epoch + 1) % 5 == 0:
-            checkpoint_path = checkpoint_dir / f"simclr_checkpoint_epoch_{epoch+1}_A_val.pth"
-            torch.save(model.state_dict(), checkpoint_path)
-            print(f"Checkpoint saved at {checkpoint_path}")
+
         
         
         # Set the model to evaluation/validation mode
@@ -225,10 +212,15 @@ def main():
         val_loss_history.append(avg_val_loss)
         print(f"Epoch [{epoch+1}/{epochs}], Losses :: Train = {avg_train_loss:.4f} , Val = {avg_val_loss:.4f}")      
                 
-                
+        # Save model checkpoint
+        if (epoch + 1) % 5 == 0:
+            checkpoint_path = checkpoint_dir / f"simclr_checkpoint_epoch_{epoch+1}_A_val.pth"
+            torch.save(model.state_dict(), checkpoint_path)
+            print(f"Checkpoint saved at {checkpoint_path}")       
+    
         
     print(f"Training + validation completed after {time.time()-t0_start}s!")
-    # 10 epochs run on mps backend device in ~10 minutes.
+    # 10 epochs run on mps backend device in ~10 minutes.(37 minutes with val)
     # 20 epochs run on mps backend device in ~27 minutes.
     
     
@@ -245,8 +237,6 @@ def main():
 
     # Save the plot
     plt.savefig("learning_curve_epochs_A_val.png")  # Save as PNG
-    #plt.savefig("learning_curve_epochs_A.pdf")  # Save as PDF
-    #plt.savefig("learning_curve_epochs_A.svg")  # Save as SVG
 
 
 if __name__ == "__main__":
