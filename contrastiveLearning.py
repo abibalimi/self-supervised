@@ -5,7 +5,7 @@ import torchvision.transforms as transforms
 from torchvision.datasets import CIFAR10
 from torch.utils.data import Dataset, DataLoader
 from modified_ResNet50 import ModifiedResNet50
-from transform_helpers import augmentation1, augmentation2
+from transform_helpers import augmentation1 #, augmentation2 # Leave out the Gaussian blur
 from pathlib import Path
 import matplotlib.pyplot as plt
 import time
@@ -65,7 +65,7 @@ class Encoder(nn.Module):
 
 #          ***         Projection Head         ***         #
 class ProjectionHead(nn.Module):
-    def __init__(self, input_dim=512, hidden_dim=256, output_dim=128):
+    def __init__(self, input_dim=2048, hidden_dim=512, output_dim=128):
         super(ProjectionHead, self).__init__()
         self.fc1 = nn.Linear(input_dim, hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, output_dim)
@@ -103,7 +103,7 @@ class SimCLR(nn.Module):
     
     
 #          ***         Contrastive Loss (NT-Xent)         ***         #
-def contrastive_loss(z1, z2, temperature=0.5):
+def contrastive_loss(z1, z2, temperature=0.1):
     batch_size = z1.size(0)
     z = torch.cat([z1, z2], dim=0)  # Concatenate both views
     z = nn.functional.normalize(z, dim=1)  # Normalize feature vectors
