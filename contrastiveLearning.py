@@ -34,7 +34,7 @@ epochs = 100
 class AugmentedDataset(Dataset):
     def __init__(self, dataset, augment):
         self.dataset = dataset
-        self.augmentation1 = augment
+        self.augmentation = augment
 
     def __len__(self):
         return len(self.dataset)
@@ -52,7 +52,7 @@ class AugmentedDataset(Dataset):
 class Encoder(nn.Module):
     def __init__(self):
         super(Encoder, self).__init__()
-        self.backbone = ModifiedResNet50(weights=None)   # Random initialization
+        self.backbone = ModifiedResNet50()   # Random initialization
         self.backbone.fc = nn.Identity()  # Remove the final classification layer
 
     def forward(self, x):
@@ -158,14 +158,19 @@ def main():
 
     # Learning rate schedule
     warmup_epochs = 10
-    total_epochs = 100
-    scheduler = optim.CosineAnnealingLR(optimizer, T_max=total_epochs - warmup_epochs)
-    warmup_scheduler = optim.LinearLR(optimizer, start_factor=0.01, total_iters=warmup_epochs)
+    total_epochs = epochs # 100
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=total_epochs - warmup_epochs)
+    warmup_scheduler = optim.lr_scheduler.LinearLR(optimizer, start_factor=0.01, total_iters=warmup_epochs)
 
 
     # Create a directory to save checkpoints
     checkpoint_dir = Path("./simclr_checkpoints")
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+
+    # Gradient accumulation parameters
+    accumulation_steps = 4  # Simulate batch_size=128 with accumulation
+    optimizer.zero_grad()  # Initialize gradients
 
 
     # Training loop
@@ -179,7 +184,7 @@ def main():
         per_epoch_train_loss = 0
         for batch_idx, (x1, x2, _) in enumerate(train_loader):
             # Zero the gradients for every batch!
-            optimizer.zero_grad()
+            #optimizer.zero_grad()
             
             # Move data to device and make predictions for this batch (Forward pass)
             x1, x2 = x1.to(device), x2.to(device)
@@ -187,10 +192,15 @@ def main():
 
             # Compute contrastive loss and its gradients (Backward pass)
             train_loss = contrastive_loss(z1, z2, temperature)
+            train_loss = train_loss / accumulation_steps  # Scale loss
             train_loss.backward()
             
             # Adjust learning weights
-            optimizer.step()
+            #optimizer.step()
+            # Update weights after accumulation_steps
+            if (batch_idx + 1) % accumulation_steps == 0:
+                optimizer.step()
+                optimizer.zero_grad()
             
             per_epoch_train_loss += train_loss.item()
 
@@ -238,15 +248,15 @@ def main():
 
     # Plot learning curve
     epoch_range = range(1, epochs+1)
-    plt.plot(epoch_range, train_loss_history, label="Training Loss")
-    plt.plot(epoch_range, val_loss_history, label="Validation Loss")
+    plt.plot(epoch_range, train_loss_history, label="Train")
+    plt.plot(epoch_range, val_loss_history, label="Val")
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.title("Learning Curves")
     plt.legend()
 
     # Save the plot
-    plt.savefig("learning_curve_epochs_A_val.png")  # Save as PNG
+    plt.savefig("learning_curve_epochs_reproducing_SimCLR_CIFAR-10.png")  # Save as PNG
 
 
 if __name__ == "__main__":
