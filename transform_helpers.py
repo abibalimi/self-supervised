@@ -6,7 +6,8 @@ from albumentations.pytorch import ToTensorV2
 
 # Define Albumentations augmentations
 augmentation1 = A.Compose([
-    A.RandomResizedCrop((32, 32), scale=(0.5, 1.0)),
+    # Inception-style cropping: random crop, flip, and resize to 32x32
+    A.RandomResizedCrop((32, 32), scale=(0.08, 1.0)),
     A.HorizontalFlip(),
     A.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.1),
     A.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
