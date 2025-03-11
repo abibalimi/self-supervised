@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torchvision.datasets import CIFAR10
 from torch.utils.data import Dataset, DataLoader
-from modified_ResNet50 import ModifiedResNet50
+from torchvision.models import resnet18
 from transform_helpers import augmentation1 as augment#, augmentation2 # Leave out the Gaussian blur
 from pathlib import Path
 import matplotlib.pyplot as plt
@@ -13,11 +13,11 @@ import numpy as np
 
 
 # Hyperparameters
-batch_size = 1024 #256
-base_lr = 0.3 * batch_size / 256  # Learning rate = 1.2
+batch_size = 256
+base_lr = 0.001#3 * batch_size / 256  # Learning rate = 1.2
 weight_decay = 1e-6
 temperature = 0.5
-epochs = 10
+epochs = 100
 
 # Steps:
 # 1 - Data Augmentation
@@ -52,7 +52,7 @@ class AugmentedDataset(Dataset):
 class Encoder(nn.Module):
     def __init__(self):
         super(Encoder, self).__init__()
-        self.backbone = ModifiedResNet50()   # Random initialization
+        self.backbone = resnet18()   # Random initialization
         self.backbone.fc = nn.Identity()  # Remove the final classification layer
 
     def forward(self, x):
@@ -64,7 +64,7 @@ class Encoder(nn.Module):
 
 #          ***         Projection Head         ***         #
 class ProjectionHead(nn.Module):
-    def __init__(self, input_dim=2048, hidden_dim=512, output_dim=128):
+    def __init__(self, input_dim=512, hidden_dim=256, output_dim=128):
         super(ProjectionHead, self).__init__()
         self.fc1 = nn.Linear(input_dim, hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, output_dim)
@@ -123,16 +123,30 @@ def contrastive_loss(z1, z2, temperature=0.1):
 
     
 # Load CIFAR-10 dataset
-def load_dataset(train=True):
+def load_dataset(train=True, batch_size=batch_size):
     """Loads split datasets"""
     dataset = CIFAR10(root='./data', train=train, download=True)
     augmented_dataset = AugmentedDataset(dataset, augment)
-    dataset_loader = DataLoader(augmented_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
+    dataset_loader = DataLoader(augmented_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
     return dataset_loader
     
     
+def init_model(device, base_lr, weight_decay):
+    """Initializes the model and the optimizer"""
+    encoder = Encoder().to(device)
+    projection_head = ProjectionHead().to(device)
+    model = SimCLR(encoder, projection_head).to(device)
+    optimizer = optim.Adam(model.parameters(), lr=base_lr, weight_decay=weight_decay)
+    return model, optimizer
     
     
+def lr_scheduler(optimizer, epochs=epochs, warm_up_rate = 0.1):
+    """Schedules the learning rate"""
+    warmup_epochs = epochs * warm_up_rate # 10% 
+    total_epochs = epochs # 100
+    warmup_scheduler = optim.lr_scheduler.LinearLR(optimizer, start_factor=0.01, total_iters=warmup_epochs)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=total_epochs - warmup_epochs)
+    return scheduler, warmup_scheduler, warmup_epochs
     
 def main():
     # Set device
@@ -150,17 +164,11 @@ def main():
     
 
     # Initialize model, optimizer, and loss
-    encoder = Encoder().to(device)
-    projection_head = ProjectionHead().to(device)
-    model = SimCLR(encoder, projection_head).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=base_lr, weight_decay=weight_decay)
-    
+    model, optimizer = init_model(device, base_lr, weight_decay)
 
+    
     # Learning rate schedule
-    warmup_epochs = epochs * .1
-    total_epochs = epochs # 100
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=total_epochs - warmup_epochs)
-    warmup_scheduler = optim.lr_scheduler.LinearLR(optimizer, start_factor=0.01, total_iters=warmup_epochs)
+    scheduler, warmup_scheduler, warmup_epochs = lr_scheduler(optimizer)
 
 
     # Create a directory to save checkpoints
@@ -168,24 +176,20 @@ def main():
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
 
+    #          ***         Training loop         ***         #
+    
     # Gradient accumulation parameters
     accumulation_steps = 4  # Simulate batch_size=128 with accumulation
     optimizer.zero_grad()  # Initialize gradients
 
-
-    # Training loop
-    t0_start = time.time()
-
     train_loss_history = []
     val_loss_history = []
-
+    
+    t0_start = time.time()
     for epoch in range(epochs):
         model.train()
         per_epoch_train_loss = 0
         for batch_idx, (x1, x2, _) in enumerate(train_loader):
-            # Zero the gradients for every batch!
-            #optimizer.zero_grad()
-            
             # Move data to device and make predictions for this batch (Forward pass)
             x1, x2 = x1.to(device), x2.to(device)
             z1, z2 = model(x1, x2)
@@ -195,17 +199,15 @@ def main():
             train_loss = train_loss / accumulation_steps  # Scale loss
             train_loss.backward()
             
-            # Adjust learning weights
-            #optimizer.step()
             # Update weights after accumulation_steps
             if (batch_idx + 1) % accumulation_steps == 0:
                 optimizer.step()
-                optimizer.zero_grad()
+                optimizer.zero_grad()  # Zero the gradients for every batch!
             
             per_epoch_train_loss += train_loss.item()
 
 
-         # Update learning rate
+        # Update learning rate
         if epoch < warmup_epochs:
             warmup_scheduler.step()
         else:
@@ -259,7 +261,7 @@ def main():
     plt.legend()
 
     # Save the plot
-    plt.savefig("learning_curve_epochs_reproducing_SimCLR_CIFAR-10.png")  # Save as PNG
+    plt.savefig("learning_curve_epochs_reproducing_SimCLR_CIFAR-10_ResNet18.png")  # Save as PNG
 
 
 if __name__ == "__main__":
