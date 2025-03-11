@@ -255,7 +255,8 @@ def main():
             print(f"Checkpoint saved at {checkpoint_path}")       
     
          # Free up memory
-        torch.cuda.empty_cache()
+        #torch.cuda.empty_cache()
+        torch.mps.empty_cache()
     
     
     print(f"Training + validation completed after {time.time()-t0_start}s!")
