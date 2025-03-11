@@ -17,7 +17,7 @@ batch_size = 1024 #256
 base_lr = 0.3 * batch_size / 256  # Learning rate = 1.2
 weight_decay = 1e-6
 temperature = 0.5
-epochs = 100
+epochs = 10
 
 # Steps:
 # 1 - Data Augmentation
@@ -127,7 +127,7 @@ def load_dataset(train=True):
     """Loads split datasets"""
     dataset = CIFAR10(root='./data', train=train, download=True)
     augmented_dataset = AugmentedDataset(dataset, augment)
-    dataset_loader = DataLoader(augmented_dataset, batch_size=batch_size, shuffle=True, num_workers=8)
+    dataset_loader = DataLoader(augmented_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
     return dataset_loader
     
     
@@ -157,7 +157,7 @@ def main():
     
 
     # Learning rate schedule
-    warmup_epochs = 10
+    warmup_epochs = epochs * .1
     total_epochs = epochs # 100
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=total_epochs - warmup_epochs)
     warmup_scheduler = optim.lr_scheduler.LinearLR(optimizer, start_factor=0.01, total_iters=warmup_epochs)
@@ -238,7 +238,10 @@ def main():
             torch.save(model.state_dict(), checkpoint_path)
             print(f"Checkpoint saved at {checkpoint_path}")       
     
-        
+         # Free up memory
+        torch.mps.empty_cache()
+    
+    
     print(f"Training + validation completed after {time.time()-t0_start}s!")
     # 10 epochs run on mps backend device in ~10 minutes.(37 minutes with val)
     # 20 epochs run on mps backend device in ~27 minutes.
