@@ -1,4 +1,4 @@
-#/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import torch
@@ -117,7 +117,7 @@ class SimCLR(nn.Module):
     
 #          ***         Contrastive Loss (NT-Xent)         ***         #
 def contrastive_loss(z1, z2, temperature=0.1):
-    BATCH_SIZE = z1.size(0)
+    batch_size = z1.size(0)
     z = torch.cat([z1, z2], dim=0)  # Concatenate both views
     z = nn.functional.normalize(z, dim=1)  # Normalize feature vectors
 
@@ -125,8 +125,8 @@ def contrastive_loss(z1, z2, temperature=0.1):
     sim_matrix = torch.matmul(z, z.T) / temperature
 
     # Create labels for positive pairs
-    labels = torch.arange(BATCH_SIZE, device=z.device)
-    labels = torch.cat([labels + BATCH_SIZE, labels])  # Positive pairs are diagonal elements
+    labels = torch.arange(batch_size, device=z.device)
+    labels = torch.cat([labels + batch_size, labels])  # Positive pairs are diagonal elements
 
     # Compute cross-entropy loss
     loss = nn.functional.cross_entropy(sim_matrix, labels)
@@ -141,7 +141,7 @@ def load_dataset(train=True, shuffle=True, batch_size=BATCH_SIZE):
     """Loads split datasets"""
     dataset = CIFAR10(root='./data', train=train, download=True)
     augmented_dataset = AugmentedDataset(dataset, augmentation)
-    dataset_loader = DataLoader(augmented_dataset, batch_size=BATCH_SIZE, shuffle=shuffle, num_workers=4, pin_memory=True)
+    dataset_loader = DataLoader(augmented_dataset, batch_size=batch_size, shuffle=shuffle, num_workers=4, pin_memory=True)
     return dataset_loader
     
     
